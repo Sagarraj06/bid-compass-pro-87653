@@ -1,6 +1,7 @@
 // Use environment variable if available, otherwise fall back to default
 // For production, this MUST be an HTTPS URL to avoid mixed content errors
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://161.118.181.8:80/api';
+// Change to https://localhost:PORT/api when running backend locally with HTTPS
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://161.118.181.8/api';
 
 export const DAILY_CREDITS = 10;
 
