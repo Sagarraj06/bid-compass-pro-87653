@@ -1,6 +1,5 @@
-// Use environment variable if available, otherwise fall back to default
-// IMPORTANT: Use HTTP for local development, or use ngrok/cloudflare tunnel for HTTPS proxy
-// Replace with your ngrok URL: 'https://YOUR-NGROK-ID.ngrok.io/api'
+// HTTP backend configuration - MUST run frontend locally on http://localhost:8080
+// Browsers block HTTP API calls from HTTPS sites (mixed content security)
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://161.118.181.8:80/api';
 
 export const DAILY_CREDITS = 10;
