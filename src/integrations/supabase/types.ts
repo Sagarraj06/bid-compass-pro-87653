@@ -14,13 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_credits: {
+        Row: {
+          created_at: string
+          id: string
+          last_reset_at: string
+          remaining_credits: number
+          total_credits: number
+          updated_at: string
+          used_credits: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_reset_at?: string
+          remaining_credits?: number
+          total_credits?: number
+          updated_at?: string
+          used_credits?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_reset_at?: string
+          remaining_credits?: number
+          total_credits?: number
+          updated_at?: string
+          used_credits?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_and_reset_credits: {
+        Args: { p_user_id: string }
+        Returns: {
+          last_reset_at: string
+          remaining_credits: number
+          total_credits: number
+          used_credits: number
+        }[]
+      }
+      deduct_credit: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
