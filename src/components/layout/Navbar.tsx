@@ -1,7 +1,9 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { FileText, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CreditBadge } from '@/components/credits/CreditBadge';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +12,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export const Navbar = () => {
-  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success('Logged out successfully');
+    } catch (error) {
+      toast.error('Failed to logout');
+    }
   };
 
   return (
@@ -39,6 +45,9 @@ export const Navbar = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  {user?.email}
+                </div>
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { DAILY_CREDITS } from '@/utils/constants';
 import type { CreditState } from '@/types/credit.types';
 
@@ -6,6 +7,7 @@ interface CreditContextType {
   credits: CreditState;
   deductCredit: () => Promise<void>;
   resetCredits: () => void;
+  loading: boolean;
 }
 
 const CreditContext = createContext<CreditContextType | undefined>(undefined);
@@ -16,82 +18,118 @@ const getNextMidnight = (): Date => {
   return midnight;
 };
 
-const loadCreditsFromStorage = (): CreditState => {
-  const stored = localStorage.getItem('credits');
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    const resetAt = new Date(parsed.resetAt);
-    
-    // Check if we've passed midnight
-    if (new Date() >= resetAt) {
-      return {
-        total: DAILY_CREDITS,
-        used: 0,
-        remaining: DAILY_CREDITS,
-        resetAt: getNextMidnight()
-      };
-    }
-    
-    return {
-      ...parsed,
-      resetAt
-    };
-  }
-  
-  return {
+export const CreditProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [credits, setCredits] = useState<CreditState>({
     total: DAILY_CREDITS,
     used: 0,
     remaining: DAILY_CREDITS,
     resetAt: getNextMidnight()
-  };
-};
+  });
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
-export const CreditProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [credits, setCredits] = useState<CreditState>(loadCreditsFromStorage);
-
+  // Fetch credits from database
   useEffect(() => {
-    localStorage.setItem('credits', JSON.stringify(credits));
-  }, [credits]);
+    const fetchCredits = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          setLoading(false);
+          return;
+        }
 
-  useEffect(() => {
-    const checkReset = setInterval(() => {
-      const now = new Date();
-      if (now >= credits.resetAt) {
-        setCredits({
-          total: DAILY_CREDITS,
-          used: 0,
-          remaining: DAILY_CREDITS,
-          resetAt: getNextMidnight()
+        setUserId(user.id);
+
+        // Call the database function to check and reset credits
+        const { data, error } = await supabase.rpc('check_and_reset_credits', {
+          p_user_id: user.id
         });
-      }
-    }, 60000); // Check every minute
 
-    return () => clearInterval(checkReset);
-  }, [credits.resetAt]);
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const creditData = data[0];
+          setCredits({
+            total: creditData.total_credits,
+            used: creditData.used_credits,
+            remaining: creditData.remaining_credits,
+            resetAt: new Date(creditData.last_reset_at)
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching credits:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCredits();
+
+    // Check every minute if we need to refresh
+    const interval = setInterval(fetchCredits, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const deductCredit = async () => {
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
     if (credits.remaining <= 0) {
       throw new Error('No credits remaining');
     }
-    
-    setCredits(prev => ({
-      ...prev,
-      used: prev.used + 1,
-      remaining: prev.remaining - 1
-    }));
+
+    try {
+      const { data, error } = await supabase.rpc('deduct_credit', {
+        p_user_id: userId
+      });
+
+      if (error) throw error;
+
+      if (!data) {
+        throw new Error('Failed to deduct credit');
+      }
+
+      // Optimistically update UI
+      setCredits(prev => ({
+        ...prev,
+        used: prev.used + 1,
+        remaining: prev.remaining - 1
+      }));
+    } catch (error) {
+      console.error('Error deducting credit:', error);
+      throw error;
+    }
   };
 
-  const resetCredits = () => {
-    setCredits({
-      total: DAILY_CREDITS,
-      used: 0,
-      remaining: DAILY_CREDITS,
-      resetAt: getNextMidnight()
-    });
+  const resetCredits = async () => {
+    if (!userId) return;
+
+    try {
+      // Fetch fresh credits from database
+      const { data, error } = await supabase.rpc('check_and_reset_credits', {
+        p_user_id: userId
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const creditData = data[0];
+        setCredits({
+          total: creditData.total_credits,
+          used: creditData.used_credits,
+          remaining: creditData.remaining_credits,
+          resetAt: new Date(creditData.last_reset_at)
+        });
+      }
+    } catch (error) {
+      console.error('Error resetting credits:', error);
+    }
   };
 
   return (
-    <CreditContext.Provider value={{ credits, deductCredit, resetCredits }}>
+    <CreditContext.Provider value={{ credits, deductCredit, resetCredits, loading }}>
       {children}
     </CreditContext.Provider>
   );
