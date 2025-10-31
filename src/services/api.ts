@@ -8,7 +8,8 @@ import type {
   PriceBandResponse,
   CategoryItem,
   MissedWinnableResponse,
-  ReportPayload
+  ReportPayload,
+  ReportResponse
 } from '@/types/api.types';
 
 const apiClient = axios.create({
@@ -172,45 +173,15 @@ export const apiService = {
     }
   },
 
-  // PDF Generation via Lovable Cloud
-  generatePDF: async (companyName: string): Promise<{ html: string }> => {
+  // PDF Generation
+  generatePDF: async (payload: ReportPayload): Promise<ReportResponse> => {
     try {
-      // Fetch all required data
-      const [bidsData, departmentData, statesData, priceBandData, missedOpportunities, categories] = await Promise.all([
-        apiService.getBids(companyName),
-        apiService.getDepartments(),
-        apiService.getTopStates(),
-        apiService.getPriceBandAnalysis(companyName),
-        apiService.getMissedButWinnable(companyName, 5, 10),
-        apiService.getCategoryListing()
-      ]);
-
-      // Call edge function to generate HTML
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/generate-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          companyName,
-          bidsData,
-          departmentData,
-          statesData,
-          priceBandData,
-          missedOpportunities,
-          categories
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to generate report');
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      console.error('Error generating report:', error);
+      console.log('Generating PDF with payload:', payload);
+      
+      const response = await apiClient.post<ReportResponse>('/pdf', payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating PDF:', error);
       throw error;
     }
   }

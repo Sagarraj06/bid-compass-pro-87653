@@ -82,10 +82,39 @@ export interface MissedWinnableResponse {
 }
 
 export interface ReportPayload {
-  companyName: string;
-  department?: string;
-  dateRange?: {
-    start: string;
-    end: string;
+  sellerName: string;
+  department: string;
+  offeredItem: string;
+  days: number;
+  limit: number;
+}
+
+export interface ReportResponse {
+  meta: {
+    report_generated_at: string;
+    params_used: {
+      sellerName: string;
+      department: string;
+      offeredItem: string;
+      days: number;
+      limit: number;
+    };
+  };
+  data: {
+    missedButWinnable: {
+      seller: string;
+      recentWins: any[];
+      marketWins: any[];
+      ai: {
+        strategy_summary: string;
+        likely_wins: any[];
+        signals: {
+          org_affinity: Array<{ org: string; signal: string }>;
+          dept_affinity: Array<{ dept: string; signal: string }>;
+          ministry_affinity: Array<{ ministry: string; signal: string }>;
+        };
+      };
+      meta?: any;
+    };
   };
 }

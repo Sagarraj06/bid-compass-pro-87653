@@ -11,17 +11,23 @@ import { useCredits } from '@/contexts/CreditContext';
 import { toast } from 'sonner';
 import { sanitizeInput } from '@/utils/formatters';
 import { apiService } from '@/services/api';
-import { generatePDFFromHTML } from '@/utils/pdfGenerator';
 
 export default function ReportGeneration() {
-  const [companyName, setCompanyName] = useState('');
+  const [sellerName, setSellerName] = useState('');
+  const [department, setDepartment] = useState('');
+  const [offeredItem, setOfferedItem] = useState('');
+  const [days, setDays] = useState(60);
+  const [limit, setLimit] = useState(10);
   const [loading, setLoading] = useState(false);
   const { credits, deductCredit } = useCredits();
 
   const handleGenerate = async () => {
-    const sanitized = sanitizeInput(companyName);
-    if (!sanitized) {
-      toast.error('Please enter a company name');
+    const sanitizedSeller = sanitizeInput(sellerName);
+    const sanitizedDept = sanitizeInput(department);
+    const sanitizedItem = sanitizeInput(offeredItem);
+    
+    if (!sanitizedSeller || !sanitizedDept || !sanitizedItem) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -35,21 +41,22 @@ export default function ReportGeneration() {
     try {
       await deductCredit();
       
-      toast.info('Fetching data and generating report...');
+      toast.info('Generating report from backend...');
       
-      // Get HTML from edge function
-      const { html } = await apiService.generatePDF(sanitized);
+      const reportData = await apiService.generatePDF({
+        sellerName: sanitizedSeller,
+        department: sanitizedDept,
+        offeredItem: sanitizedItem,
+        days,
+        limit
+      });
       
-      toast.info('Creating PDF document...');
-      
-      // Convert HTML to PDF client-side
-      const blob = await generatePDFFromHTML(html, sanitized);
-      
-      // Download PDF
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${sanitized}_Intelligence_Report.pdf`;
+      link.download = `${sanitizedSeller}_Report_${new Date().toISOString().split('T')[0]}.json`;
       link.click();
       window.URL.revokeObjectURL(url);
       
@@ -91,16 +98,57 @@ export default function ReportGeneration() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name *</Label>
+                <Label htmlFor="sellerName">Seller Name *</Label>
                 <Input
-                  id="companyName"
-                  placeholder="e.g., ROYAL IMPEX"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
+                  id="sellerName"
+                  placeholder="e.g., RAJHANS IMPEX"
+                  value={sellerName}
+                  onChange={(e) => setSellerName(e.target.value)}
                 />
-                <p className="text-sm text-muted-foreground">
-                  Enter the exact company name as it appears in tender documents
-                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="department">Department *</Label>
+                <Input
+                  id="department"
+                  placeholder="e.g., Department Of Defence"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="offeredItem">Offered Item *</Label>
+                <Input
+                  id="offeredItem"
+                  placeholder="e.g., Item Categories : FUSE 6 23X32 MM..."
+                  value={offeredItem}
+                  onChange={(e) => setOfferedItem(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="days">Days</Label>
+                  <Input
+                    id="days"
+                    type="number"
+                    value={days}
+                    onChange={(e) => setDays(Number(e.target.value))}
+                    min="1"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="limit">Limit</Label>
+                  <Input
+                    id="limit"
+                    type="number"
+                    value={limit}
+                    onChange={(e) => setLimit(Number(e.target.value))}
+                    min="1"
+                  />
+                </div>
               </div>
 
               <div className="border rounded-lg p-4 bg-muted/50">
@@ -119,7 +167,7 @@ export default function ReportGeneration() {
 
               <Button
                 onClick={handleGenerate}
-                disabled={loading || credits.remaining === 0 || !companyName}
+                disabled={loading || credits.remaining === 0 || !sellerName || !department || !offeredItem}
                 className="w-full gap-2"
                 size="lg"
               >
@@ -150,9 +198,8 @@ export default function ReportGeneration() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                PDF generation is server-side for optimal quality and performance. 
-                Reports typically take 30-60 seconds to generate. The backend service 
-                must be online for PDF generation to work.
+                Report generation connects to the backend API at {import.meta.env.VITE_API_BASE_URL || 'http://161.118.181.8:80/api'}. 
+                Reports are returned as JSON data containing missed-but-winnable opportunities and strategic insights.
               </p>
             </CardContent>
           </Card>
